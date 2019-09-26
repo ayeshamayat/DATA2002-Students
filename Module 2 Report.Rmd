@@ -1,0 +1,385 @@
+---
+title: "Module 2 Report"
+output: html_document
+author: "SID: 430345827" 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+<!-- Things to do for each question: -->
+
+<!-- a) State the null and alternative hypotheses. -->
+
+<!-- b) Use visulisation to comment the assumption of the data. -->
+
+<!-- c) Perform a suitable test (including checking any relevant assumptions and, where appropriate, justify why you chose that test over others that test the same hypothesis). -->
+
+<!-- d) Report the test statistic and p-value. -->
+
+<!-- e) Draw your conclusion about the null hypothesis based on the p-value and interpret this in the context of the original question. -->
+
+## Data
+
+The data was colected from students of DATA2002 in semester 2 of 2019 through a voluntary online survey. We will begin by reading in the data set and looking at the column names. 
+
+``` {r results = "hide"}
+library("tidyverse")
+```
+
+``` {r}
+data_original <- readr::read_csv("https://docs.google.com/spreadsheets/d/1hNeBWmVXTLyUwl6b9yTnfPn2jfbQuBdPJuhJu-FZJSo/export?gid=690048681&format=csv")
+data = data_original
+colnames(data)
+```
+
+We will now clean the data. The 'clean_names' function from the 'janitor' package was used to clean the names of the columns and then the 'rename' function to rename the column names for ease of use.
+
+``` {r}
+data <- janitor::clean_names(data_original, 'snake') %>% 
+  rename(postcode = postcode_of_where_you_live_during_semester,
+         units = what_statistics_courses_have_you_taken,
+         clubs = how_many_university_clubs_are_you_a_member_of,
+         dentist = how_long_has_it_been_since_you_last_went_to_the_dentist,
+         study = on_average_how_many_hours_per_week_did_you_spend_on_university_work_last_semester,
+         social_media = what_is_your_favourite_social_media_platform,
+         siblings = how_many_siblings_do_you_have,
+         exercise = how_many_hours_a_week_do_you_spend_exercising,
+         pet_growing_up = did_you_have_a_pet_growing_up ,
+         live_with_parents = do_you_currently_live_with_your_parents,
+         eye_colour = what_is_your_eye_colour,
+         hrs_employed = how_many_hours_per_week_do_you_work_in_paid_employment,
+         fav_season = what_is_your_favourite_season_of_the_year,
+         shoe_size = what_is_your_shoe_size,
+         height = how_tall_are_you,
+         floss_frequency = how_often_do_you_floss_your_teeth,
+         glasses = do_you_wear_glasses_or_contacts,
+         handedness = what_is_your_dominant_hand,
+         doneness = how_do_you_like_your_steak_cooked)
+
+# colnames(data)
+```
+
+Following this we saw that some entries were unrealistic; specifically those asking for the number of hours spent exercising, studying, and working during the week. Any numbers above 100 were removed using the 'mutate' function inconjunction with the 'case_when' function.
+
+``` {r}
+data = data %>% 
+  mutate(exercise = as.numeric(exercise),
+    exercise = case_when(
+    exercise > 100 ~ NA_real_, 
+    TRUE ~ exercise)) %>% 
+  mutate(study = case_when(
+    study > 100 ~ NA_real_, 
+    TRUE ~ study)) %>% 
+  mutate(hrs_employed = case_when(  
+    hrs_employed > 100 ~ NA_real_, 
+    TRUE ~ hrs_employed))
+```
+
+The height column also needed cleaning because it contains some nonesense values and the data looks to be a mix of measuremenrts in metres and millimeters. We will convert them to be all in millimeters using the 'mutate' and 'case_when' functions again.
+
+``` {r}
+data = data %>% 
+  mutate(height = case_when( 
+    height > 230 ~ NA_real_, 
+    height < 100 ~ NA_real_, 
+    TRUE ~ height)) 
+```
+
+
+The shoe size data presented a problem as there are many show sizing charts. Australian shoe sized were assumed where appropriate and European otherwise. There was also one case that was assumed to be in millimeters. The sizes were converted as I saw fit after consulting several shoe sizing charts. Many of the values had to be manually converted as per the code below. Again, we used the 'mutate' and 'case_when' functions.
+
+``` {r}
+data = data %>%
+  mutate(shoe_size = case_when(
+    shoe_size < 3 ~ NA_real_,
+    shoe_size > 15 & shoe_size < 35 ~ NA_real_, 
+    shoe_size == 36 ~ 4,
+    shoe_size == 37 ~ 5,
+    shoe_size == 37.5 ~ 5,
+    shoe_size == 38 ~ 6,
+    shoe_size == 40 ~ 7,
+    shoe_size == 41 ~ 8,
+    shoe_size == 42 ~ 8,
+    shoe_size == 42.5 ~ 9,
+    shoe_size == 43 ~ 9,
+    shoe_size == 44 ~ 10,
+    shoe_size == 45 ~ 11,
+    shoe_size == 46 ~ 12,
+    shoe_size == 285 ~ 12,
+    shoe_size > 300 ~ NA_real_,
+    TRUE ~ shoe_size))
+```
+
+We will also clean the column "gender" for which the input was varied. We will use the 'recode_gender' function from the 'gendercodeR' package to help us with this.
+
+``` {r}
+# install.packages("remotes")
+# remotes::install_github("ropenscilabs/gendercodeR")
+data = data %>%
+  mutate(gender = gendercodeR::recode_gender(gender))
+```
+
+We will now clean the social media column. First, we will make all entries to title case with the 'str_to_title' function from the 'stringr' package. Then we will recode any unusual entries with the 'dplyr' package's 'recode' function. 
+# Maybe we will also use 'forcat' package's 'fct_lump' to lump together the variables with less than X entries.
+
+``` {r}
+data = data %>%
+  mutate(social_media = stringr::str_to_title(social_media),
+         social_media = dplyr::recode(social_media, 
+                                      'Facebook Messenger' = "Facebook", 
+                                      'Fb' = "Facebook",
+                                      'I Never Use Social Media.' = "None",
+                                      'Ig' = "Instagram",
+                                      'Titktok' = "Tiktok",
+                                      'L I N K E D I N' = "Linkedin",
+                                      '-=-=-' = "None"))
+```
+
+Finally, we will clean the eye colour column using the same functions we used for the social media column; 
+'str_to_title' from 'stringr', and 'recode' from 'dplyr'.
+
+``` {r}
+data = data %>%
+  mutate(eye_colour = stringr::str_to_title(eye_colour),
+         eye_colour = dplyr::recode(eye_colour,
+                                    '&' = NA_character_,
+                                    'Balack' = "Black",
+                                    'Blood' = NA_character_,
+                                    'Hazelnut' = "Hazel",
+                                    'Null' = NA_character_))
+```
+
+With that we have finished cleaning our data and can move on to answering some questions.
+
+## Questions
+
+### 1 & 2. Is this a random sample of DATA2002 students? What are the potential biases in this data generation?
+
+Short answer, no. The data was collected through a voluntary survey of DATA2002 students through a Google doc survey posted on Ed so it is not a random sample of DATA2002 students.
+
+The survey contains 110 entries; a number less than the number of students enrolled in DATA2002. Being a voluntary survey, it is likely that students who are more active in the unit contributed to the survey.
+
+Although voluntary sampling is a commonly used method for collecting data, it gives the collector no control over the sample. In this way, the sample is not random and is biased to students who volunteered.
+
+Nonetheless, we shall persist.
+
+### 3. Which variables are most likely to be subjected to this bias?
+
+The variables most likely to be subjected to this bias are those that are can be related to a student's lifestyle. This includes 'live with parents', 'hours on uni work', 'hours employed', and 'dentist'.
+
+For example, it could be likely that a students who lives at home has more hours to spend on uni work if they also do not working or are working only a few hours per week. They may also have visited the dentist not long ago.
+
+### 4. Is there any evidence to suggest that there’s a difference in the amount of exercise done by people who eat red meat compared to people who don’t eat red meat?
+
+First we will create a new column named 'eats_red_meat' to classify students accordingly based on their response in 'doneness'. Students who replied with "I don't eat red meat" will be denoted by 'FALSE' and all others with 'TRUE'. We will also look at the distribution of 'eats_red_meat' and 'exercise' using the 'ggplot' package and the 'geom_bar' function.
+``` {r}
+data <- mutate(data, eats_red_meat = data$doneness!="I don't eat red meat")
+
+data %>% na.omit(data$exercise) %>%
+  ggplot(aes(exercise, fill = eats_red_meat)) +
+  ggtitle("Hours of Exercise Per week and Eating Red Meat") +
+  xlab("Number of hours spent exercising per week") +
+  ylab("Number of students") +
+  geom_bar(position = position_dodge2(width = 0.9, preserve = "single")) +
+  scale_fill_discrete(name = "Eats red meat", labels = c("No","Yes")) +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'))
+```
+<!-- #density plot -->
+<!-- data %>% -->
+<!--   ggplot(aes(x = exercise, fill = eats_red_meat)) + -->
+<!--   geom_density(alpha = 0.5) + -->
+<!--   ggtitle("Hours of Exercise Per week and Eating Red Meat") + -->
+<!--   xlab("Number of hours spent exercising per week") + -->
+<!--   ylab("Density") + -->
+<!--   scale_fill_discrete(name = "Eats red meat", labels = c("No","Yes")) + -->
+<!--   theme(plot.title = element_text(hjust = 0.5, face = 'bold')) -->
+<!-- ``` -->
+
+<!-- The two samples are both right skewed so we will perform a Wilcoxon rank-sum test. -->
+
+<!-- ``` {r} -->
+<!-- ## Wilcoxon rank sum test -->
+
+<!-- ## Yield -->
+
+
+<!-- A = data %>% filter(eats_red_meat==TRUE) %>% select(exercise) %>% c() -->
+<!-- B = data %>% filter(eats_red_meat==FALSE) %>% select(exercise) %>% c() -->
+<!-- dat = data.frame( -->
+<!--   yield = c(A,B), -->
+<!--   method = c(rep("A", length(A)), -->
+<!--              rep("B", length(B))) -->
+<!-- ) -->
+<!-- ggplot(dat, aes(x = method, y = yield)) +  -->
+<!--   geom_boxplot() +  -->
+<!--   theme_minimal(base_size = 26) -->
+
+
+<!-- dat = dat %>% mutate(r = rank(yield)) -->
+<!-- w_A = sum(dat$r[dat$method == "A"]) -->
+
+
+<!-- sum_dat = dat %>% -->
+<!--   group_by(method) %>%  -->
+<!--   summarise(n = n(), -->
+<!--             w = sum(r) -->
+<!--   ) -->
+<!-- sum_dat -->
+<!-- n_A = sum_dat$n[sum_dat$method == "A"] -->
+<!-- n_B = sum_dat$n[sum_dat$method == "B"] -->
+<!-- # using the sums of the A sample -->
+<!-- w_A = sum_dat$w[sum_dat$method == "A"] -->
+<!-- ew_A = n_A * (n_A + n_B + 1)/2  -->
+<!-- minw_A = n_A * (n_A + 1)/2  -->
+<!-- c(minw_A, w_A, ew_A) # w_A > ew_A -->
+<!-- # looking in the upper tail -->
+<!-- 2 * pwilcox(w_A - minw_A - 1, n_A, n_B,  -->
+<!--             lower.tail = FALSE) -->
+
+
+<!-- sum_dat = dat %>% -->
+<!--   group_by(method) %>%  -->
+<!--   summarise(n = n(), -->
+<!--             w = sum(r) -->
+<!--   ) -->
+<!-- sum_dat -->
+<!-- n_A = sum_dat$n[sum_dat$method == "A"] -->
+<!-- n_B = sum_dat$n[sum_dat$method == "B"] -->
+<!-- # using the sums of the B sample -->
+<!-- w_B = sum_dat$w[sum_dat$method == "B"] -->
+<!-- ew_B = n_B * (n_B + n_A + 1)/2  -->
+<!-- minw_B = n_B * (n_B + 1)/2  -->
+<!-- c(minw_B, w_B, ew_B) # w_B < ew_B -->
+
+
+<!-- # looking in the lower tail -->
+<!-- 2 * pwilcox(w_B - minw_B, n_B, n_A) -->
+
+
+<!-- wilcox.test(A, B) # wilcox.test(yield ~ method, data = dat) -->
+<!-- t.test(A, B) # t.test(yield ~ method, data = dat) -->
+<!-- ``` -->
+
+H~0~: There is no difference in the number of people who eat red meat compared to people who don't eat red meat.
+
+H~1~: There is a difference in the number of people who eat red meat compared to people who don't eat red meat.
+
+Assumptions: Observations within a sample are independent of each other, as are the two samples themselves.
+
+We will perform a two sample t-test on 'exercise' and 'eats_red_meat'.
+``` {r}
+t.test(data$exercise, data$eats_red_meat, alternative = "two.sided", var.equal = TRUE)
+```
+
+The p-value is very small so we reject the null hypothesis. This suggests that there is a difference in the amount of exercise done by people who eat red meat compared to people who don’t eat red meat.
+
+### 5. Is there any evidence that the weekly exercise time of students who participate in more than 3 university clubs is different to those who don’t?
+
+H~0~: The weekly exercise of students who participate in more than three university clubs is the same to those who don’t.
+
+H~1~: There is a difference in weekly exercise of students who participate in more than three univeristy clubs is the same to those who don’t.
+
+Assumptions: Observations within a sample are independent of each other, as are the two samples themselves.
+
+First we will mutate our data set to include a column based on whether or not the students are part of more than three clubs.
+``` {r}
+data <- mutate(data, "more_than_three_clubs" = clubs>3)
+
+data %>% na.omit(exercise) %>%
+  ggplot(aes(exercise, fill = more_than_three_clubs)) + 
+  ggtitle("Participating in More Than Three Clubs and Exercise") +
+  xlab("Number of hours spent exercising per week") +
+  ylab("Number of students") +
+  scale_fill_discrete(name = "Clubs > 3", labels = c("No","Yes")) +
+  geom_bar(position = position_dodge2(width = 0.9, preserve = "single")) + 
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'))
+```
+
+We will now perform a two sample t-test on 'more_than_three_clubs' and 'exercise'.
+``` {r}
+t.test(data$more_than_three_clubs, data$exercise, alternative = "two.sided", var.equal = TRUE)
+```
+
+The p-value is small and less than 0.05 so we reject the null hypothesis. This suggests that there is a difference in the weekly exercise time between those who participate in more than three university clubs and those who do not.
+
+### 6. Is there evidence that students who live with their parents study more hours per week than students who don’t live with their parents?
+
+H~0~: Students who live with their parents study the same number of hours per week than students who don’t live with their parents.
+
+H~1~: There is a difference in the number of hours per week that students who live with their parents study to students who don’t live with their parents.
+
+Assumptions: Observations within a sample are independent of each other, as are the two samples themselves.
+
+First we will mutate the 'live_with_parents' so that it is either 'TRUE' or 'FALSE' instead of 'Yes' and 'No', respectively.
+``` {r}
+data = data %>% 
+  mutate(live_with_parents = case_when( 
+    live_with_parents=="Yes" ~ TRUE, 
+    live_with_parents=="No" ~ FALSE, 
+    TRUE ~ NA)) 
+
+data %>% na.omit(study) %>%
+  ggplot(aes(study, fill = live_with_parents)) +
+  ggtitle("Living with Parents and Exercise") +
+  xlab("Hours of study") +
+  ylab("Number of students") +
+  geom_bar(position = "dodge") +
+  scale_fill_discrete(name = "Lives with parents", labels = c("No","yes")) +
+  theme(plot.title = element_text(hjust = 0.5, face = 'bold'))
+```
+
+
+The graph is somewhat normal so we will do a two sample t-test on 'live_with_parents' and 'exercise'.
+``` {r}
+t.test(data$live_with_parents, data$exercise, alternative = "two.sided", var.equal = TRUE)
+```
+
+The p-value is small so we will reject the null hypothesis. This suggests there is evidence that students who live with their parents study more hours per week than students who don’t live with their parents.
+
+It would have been better to do a Wilcoxon rank sum test since the data is not normal; it is right skewed. However, to do so for discrete data as we have here is unclear to me. This makes the test performed above unreliable.
+
+### 7. What other questions could you ask? 
+<!-- These might also be questions we learnt to answer in Module 1 regarding the relationship between categorical variables - that’s OK, you might use the group work discussion from Lab 1C to help think of other questions to ask. -->
+
+Another question we could ask is whether there is an association between the number of hours studied and the number of siblings a student has.
+
+H~0~: There is no association between the number of hours studied and the number of siblings a student has.
+
+H~1~: There is an association between the number of hours studied and the number of siblings a student has
+
+Assumptions: e~ij~ = y~i~.y~j~/n >= 5.
+
+We will perform Fisher's test since the data does not fulfill the assumptions of Fisher's test.
+``` {r}
+
+siblings = data %>% 
+  select(siblings, study) %>% 
+  drop_na(siblings) %>% 
+  group_by(siblings, study) %>% 
+  count()
+
+c_mat = xtabs(n ~ siblings + study, siblings)
+
+fisher.test(c_mat, simulate.p.value = TRUE)
+```
+
+
+The p-value is 0.5452 which is large so we will keep the null hypothesis. It suggests that there is no association between the number of siblings a student has and the number of hours per week they study.
+
+## References 
+
+R Core Team (2018). R: A language and environment for statistical computing. R Foundation for Statistical
+Computing, Vienna, Austria. URL: https://www.R-project.org/ (https://www.R-project.org/).
+
+Hadley Wickham, Romain François, Lionel Henry and Kirill Müller (2018). dplyr: A Grammar of Data
+Manipulation. R package version 0.7.6. https://CRAN.R-project.org/package=dplyr (https://CRAN.Rproject.
+org/package=dplyr)
+
+<!-- Hadley Wickham (2007). Reshaping Data with the reshape Package. Journal of Statistical Software, 21(12), 1- -->
+<!-- 20. URL: http://www.jstatsoft.org/v21/i12/ (http://www.jstatsoft.org/v21/i12/). -->
+
+Hadley Wickham. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+
+Hadley Wickham (2017). tidyverse: Easily Install and Load the ‘Tidyverse’. R package version 1.2.1.
+https://CRAN.R-project.org/package=tidyverse (https://CRAN.R-project.org/package=tidyverse)
